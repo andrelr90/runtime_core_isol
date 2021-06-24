@@ -1,0 +1,9 @@
+VAR1="PID"
+for pid in `ps -ef | awk '{print $2}'`
+do 
+	if [ "$pid" != "$VAR1" ]
+	then	
+		taskset -cp $pid
+	fi
+done
+

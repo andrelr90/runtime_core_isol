@@ -1,8 +1,8 @@
 *
 
 !.gitignore
-!linux-5.13-rc5/kernel/sched/core.c
-!linux-5.13-rc5/arch/x86/entry/syscalls/syscall_64.tbl
-!linux-5.13-rc5/.config
+!/linux-5.13-rc5/kernel/sched/core.c
+!/linux-5.13-rc5/arch/x86/entry/syscalls/syscall_64.tbl
+!/linux-5.13-rc5/.config
 !teste.c
 !bash_process
