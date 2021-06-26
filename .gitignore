@@ -24,3 +24,4 @@ linux-5.13-rc5/arch/x86/entry/*
 linux-5.13-rc5/arch/x86/entry/syscalls/*
 !linux-5.13-rc5/arch/x86/entry/syscalls/syscall_64.tbl
 
+!core.c
