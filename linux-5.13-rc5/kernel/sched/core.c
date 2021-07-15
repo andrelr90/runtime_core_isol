@@ -256,24 +256,32 @@ struct rq *task_rq_lock(struct task_struct *p, struct rq_flags *rf)
  */
 
 SYSCALL_DEFINE1(SO, int, pid_parameter){
-	// tratar se há apenas um núcleo.
+	int i;
+	int num_cpus = num_present_cpus();
 	pid_t pid = pid_parameter;
 	cpumask_t mascara;
 	cpumask_t mascara_complemento;
 	struct task_struct *task_list;
 
-	cpumask_set_cpu(0, &mascara);
-	cpumask_clear_cpu(1, &mascara);
+	// verifica se há apenas um núcleo.
+	if(num_cpus == 1) {
+		printk("Apenas 1 nucleo, nao e possivel isola-lo.");
+		return -1;
+	}
 
-	cpumask_set_cpu(1, &mascara_complemento);
-	cpumask_clear_cpu(0, &mascara_complemento);
+	for(i = 0; i < num_cpus-1; i++) {
+		cpumask_set_cpu(i, &mascara_complemento);
+		cpumask_clear_cpu(i, &mascara);
+	}
+
+	cpumask_set_cpu(num_cpus-1, &mascara);
+	cpumask_clear_cpu(num_cpus-1, &mascara_complemento);
 
 	rcu_read_lock();
 
 	for_each_process(task_list) {
 		printk("%d ", task_list->pid);
 		sched_setaffinity(task_list->pid, &mascara_complemento);
-    	// len  += sprintf(buf+len, "\n %s %d \n",task_list->comm,task_list->pid);
 	}
 	sched_setaffinity(pid, &mascara);
 
