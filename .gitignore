@@ -3,6 +3,7 @@
 !.gitignore
 !teste.c
 !bash_process
+!get_running_processes
 
 !linux-5.13-rc5
 linux-5.13-rc5/*
