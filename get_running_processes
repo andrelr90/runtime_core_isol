@@ -1,0 +1,23 @@
+for pid in `ps -ef | awk '{print $2}'`
+do 
+	if [ "$pid" != "PID" ]
+	then
+		
+		affinity=`taskset -p $pid | awk '{split($0,m,":"); print m[2]}'`
+		name=`ps -o cmd fp $pid`
+		if [ "$affinity" != "" ] && [ "$name" != "CMD" ]
+		then
+			echo $pid
+			echo $affinity
+			for word in $name 
+			do
+				if [ "$word" != "CMD" ]
+				then
+					echo -n $word
+					echo -n " "
+				fi
+			done
+			printf "\n\n"
+		fi
+	fi
+done
