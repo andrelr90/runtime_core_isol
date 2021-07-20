@@ -1,6 +1,7 @@
 *
 
 !.gitignore
+!isol.c
 !teste.c
 !teste2.c
 !bash_process

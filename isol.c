@@ -1,18 +1,15 @@
 #include <stdio.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <sys/wait.h>
 #include <linux/kernel.h>
 #include <sys/syscall.h>
-#include <unistd.h>
 #include <stdlib.h>
 #include <math.h>
 
-void print_adresses_values(int* arr, int n){
-    for(unsigned i = 0; i < n; i++){
-        printf("end = %p \t value = %d\n", arr+i, *(arr+i));
-    }
-    printf("\n");
-}
-
-int main(int argc, char* argv[]){
+int restore_masks(int pid_parent){
     FILE *fp;
     char *line = NULL;
     size_t len = 0;
@@ -27,7 +24,6 @@ int main(int argc, char* argv[]){
     fclose(fp);
     len = 0;
     size_file /= 4;
-    printf("file size: %d\n", size_file);
 
     int *pids  = malloc(sizeof(int) * size_file);
     int *masks = malloc(sizeof(int) * size_file);
@@ -60,13 +56,45 @@ int main(int argc, char* argv[]){
         if (line)
             free(line);
     }
-
-    for(i=0; i<size_file; i++){
-        printf("%d: %d\n", pids[i],masks[i]);
-    }
     
-    long int amma = syscall(549, pids, masks, size_file);
-    printf("System call sys_hello returned %ld\n", amma);
+    long int status = syscall(549, pids, masks, size_file, pid_parent);
+    printf("System call restore returned %ld.\n", status);
 
+    return status;
+}
+
+int main(int argc, char *argv[])
+{
+    if(getuid() != 0){
+        printf("Must be executed with sudo.\n");
+        return -1;
+    }
+
+    printf("Dumping running processes.\n");
+    system("bash get_running_processes > /dump_processes 2> /dev/null");
+    printf("Dump concluded.\n");
+    
+    /*Spawn a child to run the program.*/
+    pid_t pid=fork();
+    if (pid==0) { /* child process */
+        char *argv_aux[]={"nautilus", NULL};
+
+        int i = execv(argv[1],argv_aux);
+        perror("execv");
+        printf("%d, i \n", i);
+        exit(127); /* only if execv fails */
+    }
+    else { /* pid!=0; parent process */
+        pid_t parent_pid = getpid();
+        printf("Parent pid: %d\n", parent_pid);
+        printf("Child pid: %d\n", pid);
+
+        int isol = syscall(548, pid);
+        printf("System call isolate returned %d\n", isol);
+        waitpid(pid,0,0); /* wait for child to exit */
+
+        printf("Restoring masks.\n");
+        restore_masks(parent_pid);
+    }
     return 0;
 }

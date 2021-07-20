@@ -292,34 +292,61 @@ SYSCALL_DEFINE1(SO, int, pid_parameter){
 
 
 //MODIFICADO
-SYSCALL_DEFINE2(SO2, int*, arr_pids, int, size){
-    int* user_pointer = kmalloc(sizeof(int)*size, GFP_USER);
-    int i, res;
-	struct task_struct *task;
-    u64 start_time, elapsed;
+SYSCALL_DEFINE4(SO2, int*, arr_pids, int*, arr_masks, int, size, int, pid_parent){
+    int* pid_pointer = kmalloc(sizeof(int)*size, GFP_USER);
+    int* mask_pointer = kmalloc(sizeof(int)*size, GFP_USER);
+    int i, res, res2;
+	struct task_struct *task, *task_parent, *task_list;
+    u64 start_time, elapsed, elapsed_parent;
+    cpumask_t default_mask, mask_aux;
+    int mask_int, j, k;
+    int num_cpus = num_present_cpus();
 
-    printk("end pids: %p\n", arr_pids);
-    res = copy_from_user(user_pointer, arr_pids, sizeof(int)*size);
-    printk("\n\nRES = %d\n\nBuffer from user mode: \n", res);
+    // printk("end pids: %p\n", arr_pids);
+    res = copy_from_user(pid_pointer, arr_pids, sizeof(int)*size);
+    res2 = copy_from_user(mask_pointer, arr_masks, sizeof(int)*size);
+    // printk("\n\nRES = %d\n\nBuffer from user mode: \n", res);
+    // printk("\n\nRES = %d\n\nBuffer from user mode: \n", res2);
 
+    for(i = 0; i < num_cpus; i++) {
+		cpumask_set_cpu(i, &default_mask);
+	}
+
+	rcu_read_lock();
+	// Coloca a máscara padrão em todos os processos.
+	for_each_process(task_list) {
+		sched_setaffinity(task_list->pid, &default_mask);
+	}
+
+	// Restaura as máscaras pertinentes.
+    task_parent = pid_task(find_vpid(pid_parent), PIDTYPE_PID);
     for(i = 0; i < size; i++){
-		task = pid_task(find_vpid(*(user_pointer+i)), PIDTYPE_PID);
-        //printk("end = %p \t value = %i \n", user_pointer+i, *(user_pointer+i));
+		task = pid_task(find_vpid(*(pid_pointer+i)), PIDTYPE_PID);
 		if (task != NULL){
-			// Taken from "taskstats.c" source code (line 240-241).
-			// Used the logic behind calculating the delta time in that source.
-			// Get current nanoseconds since boot
 			start_time = ktime_get_ns();
 			// Difference
 			elapsed = start_time - task->start_time;
-			// Print result to the kernel buffer
-			printk(KERN_INFO "PID: %d has ELAPSED %llu nanoseconds.", *(user_pointer+i), elapsed);
+			elapsed_parent = start_time - task_parent->start_time;
+			if (elapsed > elapsed_parent){
+				printk(KERN_INFO "PID: %d has ELAPSED %llu nanoseconds and has been running for longer than the parent. Restoring to mask: %d", *(pid_pointer+i), elapsed, *(mask_pointer+i));
+				mask_int = *(mask_pointer+i);
+				// fill aux_mask:
+				for (j=mask_int, k=num_cpus-1; k>=0; j/=2, k--){
+					if (j % 2 == 1)
+						cpumask_set_cpu(k, &mask_aux);
+					else
+						cpumask_clear_cpu(k, &mask_aux);
+				}
+				sched_setaffinity(task->pid, &mask_aux);
+			}
 		}
     }
-    
-    kfree(user_pointer);
+    rcu_read_unlock();
 
-  return 0;
+    kfree(pid_pointer);
+    kfree(mask_pointer);
+
+  	return 0;
 }
 
 // asmlinkage int __x64_sys_testSO(void){

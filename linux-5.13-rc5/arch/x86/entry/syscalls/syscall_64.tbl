@@ -412,7 +412,7 @@
 546	x32	preadv2			compat_sys_preadv64v2
 547	x32	pwritev2		compat_sys_pwritev64v2
 548	64	sowork			sys_SO
-549     64	sowork2			sys_SO2
+549 64	sowork2			sys_SO2
 # 548	64	sowork			sys_testSO
 # This is the end of the legacy x32 range.  Numbers 548 and above are
 # not special and are not to be used for x32-specific syscalls.
