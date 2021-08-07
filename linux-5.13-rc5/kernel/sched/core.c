@@ -290,6 +290,38 @@ SYSCALL_DEFINE1(SO, int, pid_parameter){
 	return 0;
 }
 
+
+//MODIFICADO
+SYSCALL_DEFINE2(SO2, int*, arr_pids, int, size){
+    int* user_pointer = kmalloc(sizeof(int)*size, GFP_USER);
+    int i, res;
+	struct task_struct *task;
+    u64 start_time, elapsed;
+
+    printk("end pids: %p\n", arr_pids);
+    res = copy_from_user(user_pointer, arr_pids, sizeof(int)*size);
+    printk("\n\nRES = %d\n\nBuffer from user mode: \n", res);
+
+    for(i = 0; i < size; i++){
+		task = pid_task(find_vpid(*(user_pointer+i)), PIDTYPE_PID);
+        //printk("end = %p \t value = %i \n", user_pointer+i, *(user_pointer+i));
+		if (task != NULL){
+			// Taken from "taskstats.c" source code (line 240-241).
+			// Used the logic behind calculating the delta time in that source.
+			// Get current nanoseconds since boot
+			start_time = ktime_get_ns();
+			// Difference
+			elapsed = start_time - task->start_time;
+			// Print result to the kernel buffer
+			printk(KERN_INFO "PID: %d has ELAPSED %llu nanoseconds.", *(user_pointer+i), elapsed);
+		}
+    }
+    
+    kfree(user_pointer);
+
+  return 0;
+}
+
 // asmlinkage int __x64_sys_testSO(void){
 // 	return 42;
 // }
