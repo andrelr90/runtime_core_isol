@@ -2,6 +2,7 @@
 
 !.gitignore
 !teste.c
+!teste2.c
 !bash_process
 !get_running_processes
 
