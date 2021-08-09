@@ -7,6 +7,7 @@
 #include <linux/kernel.h>
 #include <sys/syscall.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 
 int restore_masks(int pid_parent){
@@ -22,11 +23,12 @@ int restore_masks(int pid_parent){
         while ((read = getline(&line, &len, fp)) != -1)
             size_file ++;
     fclose(fp);
+	free(line);
     len = 0;
     size_file /= 4;
 
-    int *pids  = malloc(sizeof(int) * size_file);
-    int *masks = malloc(sizeof(int) * size_file);
+    int *pids  = (int *)malloc(sizeof(int) * size_file);
+    int *masks = (int *)malloc(sizeof(int) * size_file);
 
     fp = fopen("/dump_processes", "r");
     if (fp != NULL){
@@ -53,12 +55,14 @@ int restore_masks(int pid_parent){
         }
         
         fclose(fp);
-        if (line)
-            free(line);
+        free(line);
     }
     
     long int status = syscall(549, pids, masks, size_file, pid_parent);
     printf("System call restore returned %ld.\n", status);
+	
+	free(pids);
+	free(masks);
 
     return status;
 }
@@ -73,28 +77,66 @@ int main(int argc, char *argv[])
     printf("Dumping running processes.\n");
     system("bash get_running_processes > /dump_processes 2> /dev/null");
     printf("Dump concluded.\n");
-    
+    int i, aux, isol;
+
+	char *argv1_copy = (char*)malloc((strlen(argv[1])+1)*sizeof(char));
+	char *token = (char*)malloc((strlen(argv[1])+1)*sizeof(char));
+	char *program_name = (char*)malloc((strlen(argv[1])+1)* sizeof(char));
+	char **argv_aux = (char**)malloc((argc)* sizeof(char *)); /* Argv to new process */
+	
+	for(i = 0; i < argc; i++){
+		argv_aux[i] = NULL;
+	}
+
     /*Spawn a child to run the program.*/
     pid_t pid=fork();
     if (pid==0) { /* child process */
-        char *argv_aux[]={"nautilus", NULL};
+		strcpy(argv1_copy, argv[1]); /* copy argv, because strtok changes the string */
+		token = strtok(argv1_copy, "/");
 
-        int i = execv(argv[1],argv_aux);
+		while(token != NULL) { /* Loop to get the program name to argv[0] */
+			program_name = (char *)realloc(program_name, (strlen(token)+1)* sizeof(char));
+			strcpy(program_name, token);
+			token = strtok(NULL, "/");
+		}
+
+		argv_aux[0] = (char*)malloc((strlen(program_name)+1) * sizeof(char));
+		strcpy(argv_aux[0], program_name);
+
+		if(argc >= 3){ /* Getting the argv off new process */
+			aux = 1;
+			for(i = 2; i < argc; i++){
+				argv_aux[aux] = (char*)malloc((strlen(argv[i])+1) * sizeof(char));
+				strcpy(argv_aux[aux], argv[i]);
+				aux ++;
+			}
+		} else {
+        	argv_aux[1] = NULL;
+		}
+
+        i = execv(argv[1],argv_aux);
         perror("execv");
         printf("%d, i \n", i);
-        exit(127); /* only if execv fails */
+       	exit(127); /* only if execv fails */
     }
     else { /* pid!=0; parent process */
         pid_t parent_pid = getpid();
         printf("Parent pid: %d\n", parent_pid);
         printf("Child pid: %d\n", pid);
 
-        int isol = syscall(548, pid);
-        printf("System call isolate returned %d\n", isol);
+        isol = syscall(548, pid);
+       	printf("System call isolate returned %d\n", isol);
         waitpid(pid,0,0); /* wait for child to exit */
 
         printf("Restoring masks.\n");
         restore_masks(parent_pid);
     }
+	free(token);
+	free(program_name);
+	free(argv1_copy);
+	for(i = 0; i < argc-1; i++){
+		free(argv_aux[i]);
+	}
+	free(argv_aux);
     return 0;
 }
